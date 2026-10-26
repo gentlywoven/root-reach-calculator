@@ -2,9 +2,13 @@
 
 A faction picker for the [Root](https://ledergames.com/products/root-a-game-of-woodland-might-and-right) board game that tracks reach values and shows which factions are still viable for the current player count.
 
-Live at **https://rutsest.github.io/root-reach-calculator/**
+Live at **[gentlywoven.github.io/root-reach-calculator](https://gentlywoven.github.io/root-reach-calculator/)**
 
 > Unofficial fan-made tool, not affiliated with Leder Games or [Root](https://ledergames.com/products/root-a-game-of-woodland-might-and-right). Released under the [MIT License](./LICENSE).
+
+## About this fork
+
+This repository is a fork of the [upstream Root Reach Calculator](https://github.com/RuTsEST/root-reach-calculator). It is a working base for upcoming changes; fork-specific changes will be documented here as they are made.
 
 ## How to use
 
@@ -22,9 +26,9 @@ npm test         # unit tests
 
 ## Deploy
 
-Pushes to `master` build the CRA app and deploy to GitHub Pages via GitHub Actions (`.github/workflows/deploy-pages.yml`). You can also run the workflow manually from the Actions tab (`workflow_dispatch`).
+Pushes to `master` build the CRA app and deploy to GitHub Pages via GitHub Actions ([`.github/workflows/deploy-pages.yml`](./.github/workflows/deploy-pages.yml)). You can also run the workflow manually from the Actions tab.
 
-`package.json` `homepage` is already `https://rutsest.github.io/root-reach-calculator/` so asset paths stay correct for the project site.
+`package.json` `homepage` is `https://gentlywoven.github.io/root-reach-calculator/` so asset paths stay correct for the project site.
 
 ### Manual fallback
 
@@ -36,6 +40,6 @@ npm run build && npx gh-pages -d build
 
 Build explicitly first — the `predeploy` hook is unreliable when the dev server is running. Verify faction images are in `build/static/media/` before deploying. GitHub Pages CDN can take a few minutes to propagate.
 
-## Analytics
+## Analytics and privacy
 
-Privacy-friendly visit tracking via [GoatCounter](https://www.goatcounter.com/) (no cookies, no consent banner). Dashboard: https://ruts.goatcounter.com
+Privacy-friendly visit tracking via [GoatCounter](https://www.goatcounter.com/) (no cookies, no consent banner), loaded only on `gentlywoven.github.io`. Dashboard: https://gentlywoven.goatcounter.com
