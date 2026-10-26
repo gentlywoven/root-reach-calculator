@@ -13,7 +13,7 @@ const getFactionButtonColor = (faction) => {
     }
 }
 
-export const ChooseFactionButton = ({faction, handleFactionClick, isBanMode}) => {
+export const ChooseFactionButton = ({faction, handleFactionClick, handleCyclePlayer, isBanMode, assignedPlayer, isLocked}) => {
     // Shrink/gray only when pick mode disables the fab. In ban mode, keep full size
     // so "unavailable" factions still read as clickable ban targets.
     // Sizes come from CSS variables (see App.css) so short viewports can densify.
@@ -31,6 +31,7 @@ export const ChooseFactionButton = ({faction, handleFactionClick, isBanMode}) =>
         : "calc(var(--faction-badge-size) / 2)";
     const opacity = isPickDisabled ? "50%" : "100%"
     const fabColor = getFactionButtonColor(faction);
+    const showPlayerBubble = faction.status === IS_PICKED && Number.isInteger(assignedPlayer);
 
     // Reach Avatar at ~2 o'clock, slightly outside the rim so the Fab edge
     // cuts the number ~half-in/half-out. Margin keeps the overhang in layout.
@@ -81,6 +82,38 @@ export const ChooseFactionButton = ({faction, handleFactionClick, isBanMode}) =>
             >
                 {faction.reach}
             </Avatar>
+            {showPlayerBubble ? (
+                <Avatar
+                    component="button"
+                    type="button"
+                    onClick={(event) => {
+                        event.stopPropagation();
+                        handleCyclePlayer(faction.name);
+                    }}
+                    aria-label={`Player ${assignedPlayer} on ${faction.label}${isLocked ? ', locked' : ''}`}
+                    data-cy={`player-badge-${faction.name}`}
+                    data-locked={isLocked ? 'true' : 'false'}
+                    sx={{
+                        position: "absolute",
+                        bottom: "12%",
+                        left: "12%",
+                        transform: "translate(-50%, 50%)",
+                        width: badgeSize,
+                        height: badgeSize,
+                        fontSize: badgeFontSize,
+                        fontWeight: isLocked ? 700 : 500,
+                        lineHeight: 1,
+                        backgroundColor: isLocked ? "success.main" : "background.paper",
+                        color: isLocked ? "success.contrastText" : "text.primary",
+                        border: "2px solid",
+                        borderColor: isLocked ? "success.dark" : "primary.main",
+                        zIndex: 1,
+                        cursor: "pointer",
+                    }}
+                >
+                    {assignedPlayer}
+                </Avatar>
+            ) : null}
         </Box>
     )
 }

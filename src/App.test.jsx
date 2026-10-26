@@ -239,12 +239,16 @@ test('sessionStorage restores picks, bans, mode, and player-bot selection', () =
       marquise: IS_PICKED,
       alliance: IS_BANNED,
     },
+    playerAssignments: {
+      marquise: 2,
+    },
   }));
 
   const { container } = render(<App />);
   expect(container.querySelector('[data-cy="reach-indicator"]')).toHaveTextContent('Reach: 10 / 18+');
   expect(screen.getByRole('button', { name: /^ban$/i })).toHaveAttribute('aria-pressed', 'true');
   expect(screen.getByRole('button', { name: /^3 players$/i })).toHaveAttribute('aria-pressed', 'true');
+  expect(container.querySelector('[data-cy="player-badge-marquise"]')).toHaveTextContent('2');
   expect(container.querySelector('[data-cy="alliance"]')
     .querySelector('[data-testid="NotInterestedOutlinedIcon"]')).toBeInTheDocument();
 });
@@ -252,19 +256,110 @@ test('sessionStorage restores picks, bans, mode, and player-bot selection', () =
 test('reset clears persisted faction picks and bans', () => {
   const { container } = render(<App />);
   fireEvent.click(container.querySelector('[data-cy="marquise"]'));
+  fireEvent.click(container.querySelector('[data-cy="duchy"]'));
   fireEvent.click(screen.getByRole('button', { name: /^ban$/i }));
   fireEvent.click(container.querySelector('[data-cy="alliance"]'));
 
   const before = JSON.parse(window.sessionStorage.getItem(STORAGE_KEY));
   expect(before.factionStatuses.marquise).toBe(IS_PICKED);
   expect(before.factionStatuses.alliance).toBe(IS_BANNED);
+  expect(before.playerAssignments.marquise).toBe(1);
+  expect(before.playerAssignments.duchy).toBe(2);
+  expect(before.lockedFactions.marquise).toBe(true);
+  expect(before.lockedFactions.duchy).toBe(true);
 
   fireEvent.click(screen.getByRole('button', { name: /reset/i }));
   expect(container.querySelector('[data-cy="reach-indicator"]')).toHaveTextContent('Reach: 0 / 21+');
 
   const after = JSON.parse(window.sessionStorage.getItem(STORAGE_KEY));
   expect(after.factionStatuses).toEqual({});
+  expect(after.playerAssignments).toEqual({});
+  expect(after.lockedFactions).toEqual({});
   expect(after.isBanMode).toBe(true);
+});
+
+test('picked factions get player bubbles starting from player 1', () => {
+  const { container } = render(<App />);
+  fireEvent.click(container.querySelector('[data-cy="marquise"]'));
+  fireEvent.click(container.querySelector('[data-cy="duchy"]'));
+
+  expect(container.querySelector('[data-cy="player-badge-marquise"]')).toHaveTextContent('1');
+  expect(container.querySelector('[data-cy="player-badge-duchy"]')).toHaveTextContent('2');
+  expect(container.querySelector('[data-cy="player-badge-marquise"]')).toHaveAttribute('data-locked', 'true');
+  expect(container.querySelector('[data-cy="player-badge-duchy"]')).toHaveAttribute('data-locked', 'true');
+});
+
+test('clicking a player bubble cycles and swaps player numbers', () => {
+  const { container } = render(<App />);
+  fireEvent.click(container.querySelector('[data-cy="marquise"]'));
+  fireEvent.click(container.querySelector('[data-cy="duchy"]'));
+
+  fireEvent.click(container.querySelector('[data-cy="player-badge-marquise"]'));
+  expect(container.querySelector('[data-cy="player-badge-marquise"]')).toHaveTextContent('2');
+  expect(container.querySelector('[data-cy="player-badge-duchy"]')).toHaveTextContent('1');
+});
+
+test('random complete fills up to max players while respecting bans', () => {
+  const { container } = render(<App />);
+  fireEvent.click(screen.getByRole('button', { name: /^ban$/i }));
+  fireEvent.click(container.querySelector('[data-cy="marquise"]'));
+  fireEvent.click(screen.getByRole('button', { name: /^pick$/i }));
+
+  fireEvent.click(screen.getByRole('button', { name: /random complete picks/i }));
+
+  expect(container.querySelector('[data-cy="marquise"]')
+    .querySelector('[data-testid="NotInterestedOutlinedIcon"]')).toBeInTheDocument();
+  expect(container.querySelectorAll('[data-testid="CheckCircleOutlineIcon"]').length).toBe(4);
+});
+
+test('random complete rerolls only unlocked picks', () => {
+  const randomSpy = vi.spyOn(Math, 'random')
+    .mockReturnValueOnce(0)
+    .mockReturnValueOnce(0)
+    .mockReturnValueOnce(0)
+    .mockReturnValueOnce(0.999)
+    .mockReturnValueOnce(0.999)
+    .mockReturnValueOnce(0.999);
+
+  const { container } = render(<App />);
+  fireEvent.click(container.querySelector('[data-cy="marquise"]'));
+
+  fireEvent.click(screen.getByRole('button', { name: /random complete picks/i }));
+  const firstRandomPicked = Array.from(container.querySelectorAll('[data-testid="CheckCircleOutlineIcon"]'))
+    .map((icon) => icon.closest('[data-cy]')?.getAttribute('data-cy'))
+    .filter((name) => name && name !== 'marquise');
+
+  fireEvent.click(screen.getByRole('button', { name: /random complete picks/i }));
+  const secondRandomPicked = Array.from(container.querySelectorAll('[data-testid="CheckCircleOutlineIcon"]'))
+    .map((icon) => icon.closest('[data-cy]')?.getAttribute('data-cy'))
+    .filter((name) => name && name !== 'marquise');
+
+  expect(container.querySelector('[data-cy="marquise"]')
+    .querySelector('[data-testid="CheckCircleOutlineIcon"]')).toBeInTheDocument();
+  expect(container.querySelector('[data-cy="player-badge-marquise"]')).toHaveAttribute('data-locked', 'true');
+  expect(firstRandomPicked.length).toBe(3);
+  expect(secondRandomPicked.length).toBe(3);
+  expect(secondRandomPicked.join('|')).not.toBe(firstRandomPicked.join('|'));
+
+  randomSpy.mockRestore();
+});
+
+test('random complete stops when no reach-valid picks remain', () => {
+  const { container } = render(<App />);
+  fireEvent.click(screen.getByRole('button', { name: /^6 players$/i }));
+  fireEvent.click(screen.getByRole('button', { name: /^ban$/i }));
+
+  fireEvent.click(container.querySelector('[data-cy="marquise"]'));
+  fireEvent.click(container.querySelector('[data-cy="hundreds"]'));
+  fireEvent.click(container.querySelector('[data-cy="duchy"]'));
+  fireEvent.click(container.querySelector('[data-cy="keepers"]'));
+  fireEvent.click(container.querySelector('[data-cy="lilypad"]'));
+  fireEvent.click(container.querySelector('[data-cy="eyrie"]'));
+
+  fireEvent.click(screen.getByRole('button', { name: /^pick$/i }));
+  fireEvent.click(screen.getByRole('button', { name: /random complete picks/i }));
+
+  expect(container.querySelectorAll('[data-testid="CheckCircleOutlineIcon"]').length).toBe(0);
 });
 
 test('default theme preference is system; OS dark opens dark', () => {

@@ -4,6 +4,8 @@ const DEFAULT_SESSION = {
     selectedValue: 'player4',
     isBanMode: false,
     factionStatuses: {},
+    playerAssignments: {},
+    lockedFactions: {},
 };
 
 export function loadSession() {
@@ -19,6 +21,14 @@ export function loadSession() {
             factionStatuses:
                 parsed.factionStatuses && typeof parsed.factionStatuses === 'object'
                     ? parsed.factionStatuses
+                    : {},
+            playerAssignments:
+                parsed.playerAssignments && typeof parsed.playerAssignments === 'object'
+                    ? parsed.playerAssignments
+                    : {},
+            lockedFactions:
+                parsed.lockedFactions && typeof parsed.lockedFactions === 'object'
+                    ? parsed.lockedFactions
                     : {},
         };
     } catch {

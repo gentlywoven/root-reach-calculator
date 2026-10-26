@@ -1,17 +1,26 @@
-import {Box} from "@mui/material";
+import { Box } from "@mui/material";
 import * as React from 'react';
-import {IS_AVAILABLE, IS_BANNED, IS_NOT_AVAILABLE, IS_PICKED} from "../constants";
-import {createInitialFactions} from "../data/factions";
-import {loadSession, saveSession} from "../sessionStorage";
-import {ChooseFactionButton} from "./ChooseFactionButton";
-
-const VALID_STATUSES = new Set([IS_PICKED, IS_BANNED, IS_AVAILABLE, IS_NOT_AVAILABLE]);
+import { IS_AVAILABLE, IS_BANNED, IS_PICKED } from "../constants";
+import { createInitialFactions } from "../data/factions";
+import {
+    assignMissingPlayers,
+    clearUnlockedPickedFactions,
+    cyclePlayerAssignment,
+    pickStatusesFromFactions,
+    randomCompletePicks,
+    recomputeFactionAvailability,
+    sanitizeLockedFactions,
+    sanitizePlayerAssignments,
+    sumPickedReach,
+} from "../factionSelection";
+import { loadSession, saveSession } from "../sessionStorage";
+import { ChooseFactionButton } from "./ChooseFactionButton";
 
 function factionsFromSession() {
     const factions = createInitialFactions();
     const { factionStatuses } = loadSession();
     for (const key of Object.keys(factionStatuses)) {
-        if (factions[key] && VALID_STATUSES.has(factionStatuses[key])) {
+        if (factions[key]) {
             // Only restore explicit picks/bans; availability is recomputed below.
             if (factionStatuses[key] === IS_PICKED || factionStatuses[key] === IS_BANNED) {
                 factions[key].status = factionStatuses[key];
@@ -21,120 +30,111 @@ function factionsFromSession() {
     return factions;
 }
 
-function persistFactionStatuses(factions) {
-    const factionStatuses = {};
-    for (const key of Object.keys(factions)) {
-        const status = factions[key].status;
-        if (status === IS_PICKED || status === IS_BANNED) {
-            factionStatuses[key] = status;
-        }
+function assignmentsFromSession() {
+    const { playerAssignments } = loadSession();
+    if (!playerAssignments || typeof playerAssignments !== 'object') {
+        return {};
     }
-    saveSession({ factionStatuses });
+    return playerAssignments;
 }
 
-export const ChooseFactionButtons = ({playerCount, setReach, requiredReach, isBanMode}) => {
+function lockedFactionsFromSession() {
+    const { lockedFactions } = loadSession();
+    if (!lockedFactions || typeof lockedFactions !== 'object') {
+        return {};
+    }
+    return lockedFactions;
+}
+
+function persistSelection(factions, playerAssignments, lockedFactions) {
+    saveSession({
+        factionStatuses: pickStatusesFromFactions(factions),
+        playerAssignments,
+        lockedFactions,
+    });
+}
+
+export const ChooseFactionButtons = ({playerCount, setReach, requiredReach, isBanMode, randomizeSignal}) => {
     const [factions, setFactions] = React.useState(() => factionsFromSession());
+    const [playerAssignments, setPlayerAssignments] = React.useState(() => assignmentsFromSession());
+    const [lockedFactions, setLockedFactions] = React.useState(() => lockedFactionsFromSession());
+    const lastHandledRandomizeSignalRef = React.useRef(randomizeSignal);
 
-    const setAvailableFactions = React.useCallback((previousFactions) => {
-        const factions = {...previousFactions};
-        const pickedFactions = Object.values(factions).filter((faction) => faction.status === IS_PICKED)
-
-        // If the number of picked factions >= number of players in game then set every not picked and not banned faction as disabled
-        if (pickedFactions.length >= playerCount) {
-
-            for (const key in factions) {
-                if (!(factions[key].status === IS_PICKED || factions[key].status === IS_BANNED)) {
-                    factions[key].status = IS_NOT_AVAILABLE
-                }
-            }
-
-            return factions;
-        }
-
-        // Filter out picked and banned factions
-        let sortedFactionArray = Object.values(factions)
-            .filter((faction) => !(faction.status === IS_PICKED || faction.status === IS_BANNED))
-            .sort((faction1, faction2) => {
-                if (faction1.reach > faction2.reach) {
-                    return -1;
-                }
-                if (faction1.reach < faction2.reach) {
-                    return 1;
-                }
-                return 0;
-            });
-
-        const playersStillToPick = playerCount - pickedFactions.length;
-
-        const reach = Object.values(factions)
-            .filter((faction) => faction.status === IS_PICKED)
-            .map((faction) => faction.reach)
-            .reduce((total, currentFactionReach) => total + currentFactionReach, 0);
-
-        for (const factionsKey in factions) {
-            if (factions[factionsKey].status === IS_PICKED || factions[factionsKey].status === IS_BANNED) {
-                continue;
-            }
-
-            if (factions[factionsKey].name === "vagabond2" && (factions.vagabond1.status !== IS_PICKED)){
-                factions[factionsKey].status = IS_NOT_AVAILABLE;
-                continue
-            }
-
-            // Knaves of the Deepwood use Vagabond components and cannot be played with any Vagabond
-            if (factions[factionsKey].name === "knaves" && (factions.vagabond1.status === IS_PICKED || factions.vagabond2.status === IS_PICKED)) {
-                factions[factionsKey].status = IS_NOT_AVAILABLE;
-                continue
-            }
-            if ((factions[factionsKey].name === "vagabond1" || factions[factionsKey].name === "vagabond2") && factions.knaves.status === IS_PICKED) {
-                factions[factionsKey].status = IS_NOT_AVAILABLE;
-                continue
-            }
-
-            let sortedFactionArrayWithoutFaction = sortedFactionArray.filter((faction) => faction.name !== factionsKey)
-            let maxReachForFaction = factions[factionsKey].reach;
-            for (let i = 0; i < playersStillToPick - 1; i++) {
-                if (sortedFactionArrayWithoutFaction[i]) {
-                    maxReachForFaction += sortedFactionArrayWithoutFaction[i].reach
-                }
-            }
-
-            if (reach + maxReachForFaction < requiredReach) {
-                factions[factionsKey].status = IS_NOT_AVAILABLE
-            } else {
-                factions[factionsKey].status = IS_AVAILABLE
-            }
-        }
-
-        return factions;
+    const applySelectionRules = React.useCallback((baseFactions, baseAssignments, baseLockedFactions) => {
+        const nextFactions = recomputeFactionAvailability(baseFactions, playerCount, requiredReach);
+        const nextLockedFactions = sanitizeLockedFactions(baseLockedFactions, nextFactions);
+        const sanitizedAssignments = sanitizePlayerAssignments(baseAssignments, nextFactions, playerCount);
+        const nextAssignments = assignMissingPlayers(sanitizedAssignments, nextFactions, playerCount);
+        return {
+            factions: nextFactions,
+            playerAssignments: nextAssignments,
+            lockedFactions: nextLockedFactions,
+        };
     }, [playerCount, requiredReach]);
 
     React.useEffect(() => {
-        setFactions(prev => setAvailableFactions(prev));
-    }, [setAvailableFactions]);
+        const nextSelection = applySelectionRules(factions, playerAssignments, lockedFactions);
+        setFactions(nextSelection.factions);
+        setPlayerAssignments(nextSelection.playerAssignments);
+        setLockedFactions(nextSelection.lockedFactions);
+        persistSelection(nextSelection.factions, nextSelection.playerAssignments, nextSelection.lockedFactions);
+    }, [applySelectionRules]);
 
     const handleFactionClick = (factionName) => {
-        let newFactions = {...factions};
+        const newFactions = {...factions};
+        const newLockedFactions = { ...lockedFactions };
         const currentStatus = factions[factionName].status;
 
         if (isBanMode) {
             newFactions[factionName].status = (currentStatus === IS_BANNED) ? IS_AVAILABLE : IS_BANNED;
+            delete newLockedFactions[factionName];
         } else {
             newFactions[factionName].status = (currentStatus === IS_PICKED) ? IS_AVAILABLE : IS_PICKED;
+            if (newFactions[factionName].status === IS_PICKED) {
+                newLockedFactions[factionName] = true;
+            } else {
+                delete newLockedFactions[factionName];
+            }
         }
 
-        newFactions = setAvailableFactions(newFactions);
-        setFactions(newFactions);
-        persistFactionStatuses(newFactions);
+        const nextSelection = applySelectionRules(newFactions, playerAssignments, newLockedFactions);
+        setFactions(nextSelection.factions);
+        setPlayerAssignments(nextSelection.playerAssignments);
+        setLockedFactions(nextSelection.lockedFactions);
+        persistSelection(nextSelection.factions, nextSelection.playerAssignments, nextSelection.lockedFactions);
     }
 
-    React.useEffect(() => {
-        const reach = Object.values(factions)
-            .filter((faction) => faction.status === IS_PICKED)
-            .map((faction) => faction.reach)
-            .reduce((total, currentFactionReach) => total + currentFactionReach, 0);
+    const handleCyclePlayer = (factionName) => {
+        const cycledAssignments = cyclePlayerAssignment(playerAssignments, factionName, factions, playerCount);
+        setPlayerAssignments(cycledAssignments);
+        persistSelection(factions, cycledAssignments, lockedFactions);
+    };
 
-        setReach(reach);
+    const handleRandomComplete = () => {
+        const lockedOnly = sanitizeLockedFactions(lockedFactions, factions);
+        const factionsForRandom = clearUnlockedPickedFactions(factions, lockedOnly);
+        const assignmentsForRandom = { ...playerAssignments };
+        for (const key of Object.keys(assignmentsForRandom)) {
+            if (!lockedOnly[key]) {
+                delete assignmentsForRandom[key];
+            }
+        }
+
+        const nextSelection = randomCompletePicks(factionsForRandom, assignmentsForRandom, playerCount, requiredReach);
+        setFactions(nextSelection.factions);
+        setPlayerAssignments(nextSelection.assignments);
+        setLockedFactions(lockedOnly);
+        persistSelection(nextSelection.factions, nextSelection.assignments, lockedOnly);
+    };
+
+    React.useEffect(() => {
+        if (randomizeSignal <= lastHandledRandomizeSignalRef.current) return;
+        lastHandledRandomizeSignalRef.current = randomizeSignal;
+        handleRandomComplete();
+    }, [randomizeSignal]);
+
+    React.useEffect(() => {
+        setReach(sumPickedReach(factions));
     }, [setReach, factions])
 
     const factionArray = Object.values(factions);
@@ -152,8 +152,11 @@ export const ChooseFactionButtons = ({playerCount, setReach, requiredReach, isBa
                     <Box key={index} sx={{ display: "flex", justifyContent: "center", alignItems: "center", gridColumn }}>
                         <ChooseFactionButton
                             handleFactionClick={handleFactionClick}
+                            handleCyclePlayer={handleCyclePlayer}
                             faction={faction}
                             isBanMode={isBanMode}
+                            assignedPlayer={playerAssignments[faction.name]}
+                            isLocked={lockedFactions[faction.name] === true}
                         />
                     </Box>
                 );

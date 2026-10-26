@@ -3,6 +3,7 @@ import * as React from "react";
 import { Box, CssBaseline, IconButton, ToggleButton, ToggleButtonGroup } from "@mui/material";
 import { ThemeProvider } from "@mui/material/styles";
 import RefreshIcon from "@mui/icons-material/Refresh";
+import ShuffleIcon from "@mui/icons-material/Shuffle";
 import { PlayerCountButtons } from "./components/PlayerCountButtons";
 import { ChooseFactionButtons } from "./components/ChooseFactionButtons";
 import { ThemeToggleButton } from "./components/ThemeToggleButton";
@@ -55,6 +56,7 @@ function App() {
     const [selectedValue, setSelectedValue] = React.useState(initial.selectedValue);
     const [isBanMode, setIsBanMode] = React.useState(initial.isBanMode);
     const [resetKey, setResetKey] = React.useState(0);
+    const [randomizeSignal, setRandomizeSignal] = React.useState(0);
 
     const [themePreference, setThemePreference] = React.useState(() => loadThemePreference());
     const [systemPrefersDark, setSystemPrefersDark] = React.useState(() => getSystemPrefersDark());
@@ -106,9 +108,13 @@ function App() {
 
     const handleReset = () => {
         // Clear picks/bans from session; keep mode and player/bot selection.
-        saveSession({ factionStatuses: {} });
+        saveSession({ factionStatuses: {}, playerAssignments: {}, lockedFactions: {} });
         setResetKey(k => k + 1);
     };
+
+    const handleRandomComplete = React.useCallback(() => {
+        setRandomizeSignal((v) => v + 1);
+    }, []);
 
     return (
         <ThemeProvider theme={theme}>
@@ -138,6 +144,9 @@ function App() {
                     <ReachIndicator reach={reach} requiredReach={requiredReach} />
                     <Box className="app-header-actions">
                         <ThemeToggleButton preference={themePreference} onToggle={handleThemeToggle} />
+                        <IconButton onClick={handleRandomComplete} size="small" aria-label="random complete picks" data-cy="random-complete-button">
+                            <ShuffleIcon />
+                        </IconButton>
                         <IconButton onClick={handleReset} size="small" aria-label="reset">
                             <RefreshIcon />
                         </IconButton>
@@ -151,6 +160,7 @@ function App() {
                             setReach={setReach}
                             requiredReach={requiredReach}
                             isBanMode={isBanMode}
+                            randomizeSignal={randomizeSignal}
                         />
                     </Box>
                 </Box>
