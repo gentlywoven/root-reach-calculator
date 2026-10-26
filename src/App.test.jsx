@@ -5,15 +5,15 @@ import { THEME_STORAGE_KEY } from './theme';
 import { IS_BANNED, IS_PICKED } from './constants';
 
 function mockMatchMedia(matchesDark) {
-  window.matchMedia = jest.fn().mockImplementation((query) => ({
+  window.matchMedia = vi.fn().mockImplementation((query) => ({
     matches: query === '(prefers-color-scheme: dark)' ? matchesDark : false,
     media: query,
     onchange: null,
-    addListener: jest.fn(),
-    removeListener: jest.fn(),
-    addEventListener: jest.fn(),
-    removeEventListener: jest.fn(),
-    dispatchEvent: jest.fn(),
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
   }));
 }
 

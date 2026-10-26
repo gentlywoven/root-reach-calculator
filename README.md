@@ -20,13 +20,13 @@ This repository is a fork of the [upstream Root Reach Calculator](https://github
 ## Development
 
 ```bash
-npm start        # dev server at localhost:3000
+npm run dev      # Vite dev server at localhost:5173
 npm test         # unit tests
 ```
 
 ## Deploy
 
-Pushes to `master` build the CRA app and deploy to GitHub Pages via GitHub Actions ([`.github/workflows/deploy-pages.yml`](./.github/workflows/deploy-pages.yml)). You can also run the workflow manually from the Actions tab.
+Pushes to `master` build the Vite app and deploy to GitHub Pages via GitHub Actions ([`.github/workflows/deploy-pages.yml`](./.github/workflows/deploy-pages.yml)). You can also run the workflow manually from the Actions tab.
 
 `package.json` `homepage` is `https://gentlywoven.github.io/root-reach-calculator/` so asset paths stay correct for the project site.
 
@@ -35,10 +35,10 @@ Pushes to `master` build the CRA app and deploy to GitHub Pages via GitHub Actio
 If you need to publish from a laptop without waiting on Actions:
 
 ```bash
-npm run build && npx gh-pages -d build
+npm run build && npx gh-pages -d dist
 ```
 
-Build explicitly first — the `predeploy` hook is unreliable when the dev server is running. Verify faction images are in `build/static/media/` before deploying. GitHub Pages CDN can take a few minutes to propagate.
+Build explicitly first. Verify faction images are in `dist/assets/` before deploying. GitHub Pages CDN can take a few minutes to propagate.
 
 ## Analytics and privacy
 
