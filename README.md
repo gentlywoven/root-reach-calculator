@@ -8,7 +8,9 @@ Live at **[gentlywoven.github.io/root-reach-calculator](https://gentlywoven.gith
 
 ## About this fork
 
-This repository is a fork of the [upstream Root Reach Calculator](https://github.com/RuTsEST/root-reach-calculator). It is a working base for upcoming changes; fork-specific changes will be documented here as they are made.
+This repository is a fork of the [upstream Root Reach Calculator](https://github.com/RuTsEST/root-reach-calculator). This fork adds player assignment badges on picked factions, including manual-lock behavior and swapping player numbers by clicking the badge.
+
+It also adds a header quick-action to randomly complete legal picks up to the selected player count while honoring bans and reach constraints, and rerolls only unlocked (non-manual) picks on repeated clicks.
 
 ## How to use
 
